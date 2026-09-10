@@ -355,14 +355,18 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "online", service: "ZEHRIN Gemini Server", model: MODEL });
 });
 
-if (fs.existsSync(distDir)) {
+if (fs.existsSync(distDir) && process.env.VERCEL !== "1") {
   app.use(express.static(distDir));
   app.get(/^(?!\/api\/).*/, (_req, res) => {
     res.sendFile(path.join(distDir, "index.html"));
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`🤖 ZEHRIN server: http://localhost:${PORT}`);
-  console.log(`   Using model: ${MODEL}`);
-});
+if (process.env.VERCEL !== "1") {
+  app.listen(PORT, () => {
+    console.log(`🤖 ZEHRIN server: http://localhost:${PORT}`);
+    console.log(`   Using model: ${MODEL}`);
+  });
+}
+
+export default app;
