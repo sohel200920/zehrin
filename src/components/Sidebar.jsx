@@ -24,6 +24,13 @@ export default function Sidebar({
     setEditingId(null);
   }
 
+  function handleSessionClick(sessionId) {
+    onSwitchSession(sessionId);
+    if (window.innerWidth <= 680) {
+      setCollapsed(true);
+    }
+  }
+
   return (
     <div className={`sidebar ${collapsed ? "collapsed" : ""}`}>
       <div className="sidebar-header">
@@ -40,7 +47,7 @@ export default function Sidebar({
           <div
             key={s.id}
             className={`sidebar-item ${s.id === currentSessionId ? "active" : ""}`}
-            onClick={() => onSwitchSession(s.id)}
+            onClick={() => handleSessionClick(s.id)}
           >
             {editingId === s.id ? (
               <input

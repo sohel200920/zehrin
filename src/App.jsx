@@ -5,7 +5,7 @@ import SettingsPanel, { BACKGROUND_OPTIONS } from "./components/SettingsPanel.js
 import { speak, stopSpeaking } from "./lib/speech.js";
 
 function uid() {
-  return (crypto.randomUUID && crypto.randomUUID()) || `${Date.now()}-${Math.random()}`;
+  return (crypto.randomUUID && crypto.randomUUID()) || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 const SESSION_STORAGE_KEY = "zehrin_session_id";

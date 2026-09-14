@@ -363,8 +363,8 @@ if (fs.existsSync(distDir) && process.env.VERCEL !== "1") {
 }
 
 if (process.env.VERCEL !== "1") {
-  app.listen(PORT, () => {
-    console.log(`🤖 ZEHRIN server: http://localhost:${PORT}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🤖 ZEHRIN server: http://0.0.0.0:${PORT}`);
     console.log(`   Using model: ${MODEL}`);
   });
 }

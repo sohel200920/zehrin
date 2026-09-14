@@ -185,7 +185,7 @@ export default function ChatPanel({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Boss, kuch poochho..."
+          placeholder="Ask anything..."
           autoComplete="off"
         />
         <button onClick={handleSend}>Send</button>

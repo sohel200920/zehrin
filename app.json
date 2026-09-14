@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "c271f21f-7812-4f08-abf0-400c2d54b3ee"
+      }
+    },
+    "android": {
+      "package": "com.matrixman28.zehrinai"
+    }
+  }
+}

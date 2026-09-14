@@ -100,8 +100,9 @@ export async function pushChatMessage(sessionId, role, text) {
 
 export async function saveChatMessage(sessionId, role, text, messageId = null) {
   if (!sessionId || !text) return null;
-  const messageRef = messageId
-    ? ref(db, `sessions/${sessionId}/messages/${messageId}`)
+  const safeMessageId = typeof messageId === "string" && !/[.#$[\]]/.test(messageId) ? messageId : null;
+  const messageRef = safeMessageId
+    ? ref(db, `sessions/${sessionId}/messages/${safeMessageId}`)
     : push(ref(db, `sessions/${sessionId}/messages`));
   await set(messageRef, { role, text, ts: Date.now() });
   return messageRef.key;
