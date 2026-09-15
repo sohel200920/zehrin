@@ -53,6 +53,12 @@ function requireGemini() {
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 app.use("/generated", express.static(generatedDir));
+app.use((error, _req, res, _next) => {
+  console.error("API request failed:", error);
+  if (!res.headersSent) {
+    res.status(500).json({ error: error?.message || "Server request failed." });
+  }
+});
 
 
 // ---------- Heuristics: only pay extra latency when actually needed ----------
