@@ -83,11 +83,15 @@ export default function App() {
     }
   }, []);
 
-  const loadSessionMessages = useCallback(async (sessionId) => {
+  const loadSessionMessages = useCallback(async (sessionId, fallbackSession = null) => {
     try {
       const res = await fetch(`/api/sessions/${sessionId}/messages`);
+      if (!res.ok) throw new Error(`Failed to load messages: ${res.status}`);
       const data = await res.json();
-      const loaded = (data.messages || []).map((m) => ({
+      const sourceMessages = data.messages || fallbackSession?.messages || [];
+      const loaded = (Array.isArray(sourceMessages)
+        ? sourceMessages
+        : Object.entries(sourceMessages).map(([id, message]) => ({ id, ...message }))).map((m) => ({
         id: m.id,
         role: m.role === "user" ? "user" : "assistant",
         text: m.text,
@@ -96,19 +100,29 @@ export default function App() {
       setMessages(loaded);
     } catch (err) {
       console.error("Failed to load messages", err);
-      setMessages([]);
+      const sourceMessages = fallbackSession?.messages || [];
+      const loaded = (Array.isArray(sourceMessages)
+        ? sourceMessages
+        : Object.entries(sourceMessages).map(([id, message]) => ({ id, ...message }))).map((m) => ({
+          id: m.id,
+          role: m.role === "user" ? "user" : "assistant",
+          text: m.text,
+          memoryEvents: []
+        }));
+      setMessages(loaded);
     }
   }, []);
 
   const switchSession = useCallback(
     (sessionId) => {
+      const selectedSession = sessions.find((session) => session.id === sessionId);
       setCurrentSessionId(sessionId);
       localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
       window.history.pushState({}, "", `/chat/${encodeURIComponent(sessionId)}`);
       stopSpeaking();
-      loadSessionMessages(sessionId);
+      loadSessionMessages(sessionId, selectedSession);
     },
-    [loadSessionMessages]
+    [loadSessionMessages, sessions]
   );
 
   const newChat = useCallback(async () => {
