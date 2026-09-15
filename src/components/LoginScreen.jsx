@@ -16,7 +16,10 @@ export default function LoginScreen({ onLogin }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, password })
       });
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await res.json()
+        : { error: `Server returned ${res.status} instead of JSON. Redeploy the latest Vercel version.` };
       if (!res.ok) throw new Error(data.error || "Login failed.");
       onLogin();
     } catch (err) {
