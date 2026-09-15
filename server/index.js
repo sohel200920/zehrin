@@ -1,6 +1,7 @@
 import "dotenv/config";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 import express from "express";
 import cors from "cors";
@@ -39,6 +40,12 @@ const PORT = Number(process.env.PORT || 3000);
 const apiKey = process.env.GEMINI_API_KEY;
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+const BOSS_ID = process.env.BOSS_ID;
+const BOSS_PASSWORD = process.env.BOSS_PASSWORD;
+const BOSS_PASSWORD_HASH = process.env.BOSS_PASSWORD_HASH;
+const AUTH_SECRET = process.env.AUTH_SECRET;
+const AUTH_COOKIE = "zehrin_auth";
+const loginAttempts = new Map();
 
 if (!apiKey || apiKey.includes("PASTE_YOUR")) {
   console.error("❌ GEMINI_API_KEY missing (.env check karo).");
@@ -57,6 +64,87 @@ app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 app.use("/generated", express.static(generatedDir));
 
+function signToken(payload) {
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = crypto.createHmac("sha256", AUTH_SECRET).update(body).digest("base64url");
+  return `${body}.${signature}`;
+}
+
+function isValidToken(token) {
+  if (!AUTH_SECRET || !token) return false;
+  const [body, signature] = token.split(".");
+  if (!body || !signature) return false;
+  const expected = crypto.createHmac("sha256", AUTH_SECRET).update(body).digest("base64url");
+  if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+    return false;
+  }
+  try {
+    const payload = JSON.parse(Buffer.from(body, "base64url").toString());
+    return payload.exp > Date.now() && payload.sub === "boss";
+  } catch {
+    return false;
+  }
+}
+
+function getCookie(req, name) {
+  return req.headers.cookie?.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`))?.slice(name.length + 1);
+}
+
+function verifyBossPassword(password) {
+  if (BOSS_PASSWORD_HASH) {
+    const [salt, expectedHash] = BOSS_PASSWORD_HASH.split(":");
+    if (!salt || !expectedHash) return false;
+    const actualHash = crypto.scryptSync(password, salt, 64).toString("hex");
+    return actualHash.length === expectedHash.length && crypto.timingSafeEqual(Buffer.from(actualHash), Buffer.from(expectedHash));
+  }
+  return Boolean(BOSS_PASSWORD) && password === BOSS_PASSWORD;
+}
+
+function requireAuth(req, res, next) {
+  if (!isValidToken(getCookie(req, AUTH_COOKIE))) {
+    return res.status(401).json({ error: "Authentication required." });
+  }
+  next();
+}
+
+app.post("/api/auth/login", (req, res) => {
+  const { id, password } = req.body || {};
+  if (!BOSS_ID || (!BOSS_PASSWORD && !BOSS_PASSWORD_HASH) || !AUTH_SECRET) {
+    return res.status(503).json({ error: "Authentication is not configured on the server." });
+  }
+  const now = Date.now();
+  const attempt = loginAttempts.get(req.ip) || { count: 0, blockedUntil: 0 };
+  if (attempt.blockedUntil > now) {
+    return res.status(429).json({ error: "Too many login attempts. Try again later." });
+  }
+  if (id !== BOSS_ID || typeof password !== "string" || !verifyBossPassword(password)) {
+    attempt.count += 1;
+    if (attempt.count >= 5) {
+      attempt.count = 0;
+      attempt.blockedUntil = now + 15 * 60 * 1000;
+    }
+    loginAttempts.set(req.ip, attempt);
+    return res.status(401).json({ error: "Invalid Boss ID or password." });
+  }
+  loginAttempts.delete(req.ip);
+  const token = signToken({ sub: "boss", exp: Date.now() + 30 * 24 * 60 * 60 * 1000 });
+  res.setHeader("Set-Cookie", `${AUTH_COOKIE}=${token}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${process.env.VERCEL === "1" ? "; Secure" : ""}`);
+  res.json({ authenticated: true });
+});
+
+app.get("/api/auth/status", (req, res) => {
+  res.json({ authenticated: isValidToken(getCookie(req, AUTH_COOKIE)) });
+});
+
+app.post("/api/auth/logout", (_req, res) => {
+  res.setHeader("Set-Cookie", `${AUTH_COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`);
+  res.json({ authenticated: false });
+});
+
+app.use("/api", (req, res, next) => {
+  if (req.path.startsWith("/auth/") || req.path === "/health") return next();
+  return requireAuth(req, res, next);
+});
 
 // ---------- Heuristics: only pay extra latency when actually needed ----------
 

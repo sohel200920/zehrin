@@ -3,6 +3,7 @@ import ChatPanel from "./components/ChatPanel.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import SettingsPanel, { BACKGROUND_OPTIONS } from "./components/SettingsPanel.jsx";
 import { speak, stopSpeaking } from "./lib/speech.js";
+import LoginScreen from "./components/LoginScreen.jsx";
 
 function uid() {
   return (crypto.randomUUID && crypto.randomUUID()) || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -37,6 +38,14 @@ export default function App() {
   const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
   const [theme, setThemeState] = useState(() => localStorage.getItem(THEME_KEY) || "dark");
   const [background, setBackgroundState] = useState(() => localStorage.getItem(BG_KEY) || "none");
+  const [authenticated, setAuthenticated] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/auth/status")
+      .then((res) => res.json())
+      .then((data) => setAuthenticated(Boolean(data.authenticated)))
+      .catch(() => setAuthenticated(false));
+  }, []);
 
   function handleTouchStart(event) {
     if (window.innerWidth <= 680) {
@@ -375,6 +384,9 @@ export default function App() {
   );
 
   const handleMicResult = useCallback((text) => sendMessage(text), [sendMessage]);
+
+  if (authenticated === null) return null;
+  if (!authenticated) return <LoginScreen onLogin={() => setAuthenticated(true)} />;
 
   return (
     <div
