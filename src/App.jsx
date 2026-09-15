@@ -104,9 +104,13 @@ export default function App() {
         id: m.id,
         role: m.role === "user" ? "user" : "assistant",
         text: m.text,
+        ts: m.ts,
         memoryEvents: []
       }));
-      setMessages(loaded);
+      setMessages(loaded.sort((a, b) => {
+        const timeDifference = (Number(a.ts) || 0) - (Number(b.ts) || 0);
+        return timeDifference || String(a.id || "").localeCompare(String(b.id || ""));
+      }));
     } catch (err) {
       console.error("Failed to load messages", err);
       const sourceMessages = fallbackSession?.messages || [];
@@ -116,9 +120,13 @@ export default function App() {
           id: m.id,
           role: m.role === "user" ? "user" : "assistant",
           text: m.text,
+          ts: m.ts,
           memoryEvents: []
         }));
-      setMessages(loaded);
+      setMessages(loaded.sort((a, b) => {
+        const timeDifference = (Number(a.ts) || 0) - (Number(b.ts) || 0);
+        return timeDifference || String(a.id || "").localeCompare(String(b.id || ""));
+      }));
     }
   }, []);
 
@@ -228,6 +236,7 @@ export default function App() {
 
     startupPromiseRef.current = (async () => {
       try {
+        await fetch("/api/sessions/cleanup-temporary", { method: "POST", keepalive: true });
         const existing = await refreshSessions();
         const routedSessionId = getChatRouteId();
         const routedSession = existing.find((session) => session.id === routedSessionId);
@@ -258,7 +267,12 @@ export default function App() {
 
     const cleanupTemporaryChat = () => {
       const id = temporarySessionRef.current;
-      if (id) navigator.sendBeacon(`/api/sessions/${id}/cleanup`);
+      if (!id) return;
+      fetch(`/api/sessions/${id}/cleanup`, {
+        method: "POST",
+        keepalive: true,
+        credentials: "include"
+      }).catch(() => {});
     };
     window.addEventListener("beforeunload", cleanupTemporaryChat);
     return undefined;

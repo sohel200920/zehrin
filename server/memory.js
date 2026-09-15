@@ -68,6 +68,17 @@ export async function getSessions() {
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
 
+export async function deleteTemporarySessions() {
+  const snap = await get(ref(db, "sessions"));
+  if (!snap.exists()) return;
+
+  const updates = {};
+  for (const [id, session] of Object.entries(snap.val())) {
+    if (session?.temporary === true) updates[`sessions/${id}`] = null;
+  }
+  if (Object.keys(updates).length) await update(ref(db), updates);
+}
+
 export async function renameSession(sessionId, title) {
   if (!sessionId || !title?.trim()) return;
   await update(ref(db, `sessions/${sessionId}`), { title: title.trim(), updatedAt: Date.now() });
@@ -89,6 +100,14 @@ export async function autoTitleSessionIfNeeded(sessionId, firstMessage) {
 export async function deleteSession(sessionId) {
   if (!sessionId) return;
   await remove(ref(db, `sessions/${sessionId}`));
+}
+
+export async function deleteTemporarySession(sessionId) {
+  if (!sessionId) return;
+  const sessionSnap = await get(ref(db, `sessions/${sessionId}`));
+  if (sessionSnap.exists() && sessionSnap.val()?.temporary === true) {
+    await remove(ref(db, `sessions/${sessionId}`));
+  }
 }
 
 export async function pushChatMessage(sessionId, role, text) {
@@ -113,7 +132,12 @@ export async function getRecentChats(sessionId, limit = 12) {
   const chatsQuery = query(ref(db, `sessions/${sessionId}/messages`), limitToLast(limit));
   const snap = await get(chatsQuery);
   if (!snap.exists()) return [];
-  return Object.values(snap.val()).sort((a, b) => a.ts - b.ts);
+  return Object.entries(snap.val())
+    .map(([id, message]) => ({ id, ...message }))
+    .sort((a, b) => {
+      const timeDifference = (Number(a.ts) || 0) - (Number(b.ts) || 0);
+      return timeDifference || a.id.localeCompare(b.id);
+    });
 }
 
 export async function getAllChats(sessionId) {
@@ -122,7 +146,10 @@ export async function getAllChats(sessionId) {
   if (!snap.exists()) return [];
   return Object.entries(snap.val())
     .map(([id, message]) => ({ id, ...message }))
-    .sort((a, b) => a.ts - b.ts);
+    .sort((a, b) => {
+      const timeDifference = (Number(a.ts) || 0) - (Number(b.ts) || 0);
+      return timeDifference || a.id.localeCompare(b.id);
+    });
 }
 
 export async function deleteChatMessage(sessionId, messageId) {

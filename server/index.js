@@ -19,11 +19,13 @@ import {
   touchSession,
   autoTitleSessionIfNeeded,
   deleteSession,
+  deleteTemporarySession,
   deleteChatMessage,
   saveChatMessage,
   replaceChatMessage,
   getRecentChats,
-  getAllChats
+  getAllChats,
+  deleteTemporarySessions
 } from "./memory.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -281,15 +283,25 @@ app.get("/api/sessions", async (_req, res) => {
 
 app.post("/api/sessions", async (_req, res) => {
   try {
+    if (_req.body?.temporary) await deleteTemporarySessions();
     res.json({ session: await createSession(Boolean(_req.body?.temporary)) });
   } catch (error) {
     res.status(500).json({ error: error?.message || "Failed to create session." });
   }
 });
 
+app.post("/api/sessions/cleanup-temporary", async (_req, res) => {
+  try {
+    await deleteTemporarySessions();
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error?.message || "Failed to clean up temporary sessions." });
+  }
+});
+
 app.post("/api/sessions/:id/cleanup", async (req, res) => {
   try {
-    await deleteSession(req.params.id);
+    await deleteTemporarySession(req.params.id);
     res.json({ ok: true });
   } catch (error) {
     res.status(500).json({ error: error?.message || "Failed to clean up temporary session." });
