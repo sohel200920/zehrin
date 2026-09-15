@@ -139,20 +139,26 @@ export default function App() {
   const renameSessionHandler = useCallback(async (id, title) => {
     setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, title } : s)));
     try {
-      await fetch(`/api/sessions/${id}`, {
-        method: "PATCH",
+      const res = await fetch("/api/actions", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title })
+        body: JSON.stringify({ action: "rename_session", sessionId: id, title })
       });
+      if (!res.ok) throw new Error("Failed to rename chat");
     } catch (err) {
       console.error("Failed to rename session", err);
+      await refreshSessions();
     }
-  }, []);
+  }, [refreshSessions]);
 
   const deleteMessage = useCallback(async (messageId) => {
     setMessages((prev) => prev.filter((message) => message.id !== messageId));
     try {
-      const res = await fetch(`/api/sessions/${currentSessionId}/messages/${messageId}`, { method: "DELETE" });
+      const res = await fetch("/api/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_message", sessionId: currentSessionId, messageId })
+      });
       if (!res.ok) throw new Error("Failed to delete message");
     } catch (err) {
       console.error(err);
@@ -174,7 +180,11 @@ export default function App() {
 
   const deleteSession = useCallback(async (sessionId) => {
     try {
-      const res = await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+      const res = await fetch("/api/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_session", sessionId })
+      });
       if (!res.ok) throw new Error("Failed to delete chat");
       const remaining = sessions.filter((session) => session.id !== sessionId);
       setSessions(remaining);

@@ -208,6 +208,27 @@ app.post("/api/sessions/:id/cleanup", async (req, res) => {
   }
 });
 
+app.post("/api/actions", async (req, res) => {
+  try {
+    const { action, sessionId, messageId, title } = req.body || {};
+    if (!sessionId) return res.status(400).json({ error: "sessionId is required." });
+
+    if (action === "rename_session") {
+      await renameSession(sessionId, title);
+    } else if (action === "delete_session") {
+      await deleteSession(sessionId);
+    } else if (action === "delete_message") {
+      await deleteChatMessage(sessionId, messageId);
+    } else {
+      return res.status(400).json({ error: "Unknown action." });
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error?.message || "Action failed." });
+  }
+});
+
 app.get("/api/sessions/:id/messages", async (req, res) => {
   try {
     res.json({ messages: await getAllChats(req.params.id) });
