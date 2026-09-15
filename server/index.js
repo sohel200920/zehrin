@@ -28,7 +28,10 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
 const distDir = path.join(projectRoot, "dist");
-const generatedDir = path.join(projectRoot, "public", "generated");
+const generatedDir =
+  process.env.VERCEL === "1"
+    ? path.join("/tmp", "zehrin-generated")
+    : path.join(projectRoot, "public", "generated");
 fs.mkdirSync(generatedDir, { recursive: true });
 
 const app = express();
@@ -53,12 +56,6 @@ function requireGemini() {
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 app.use("/generated", express.static(generatedDir));
-app.use((error, _req, res, _next) => {
-  console.error("API request failed:", error);
-  if (!res.headersSent) {
-    res.status(500).json({ error: error?.message || "Server request failed." });
-  }
-});
 
 
 // ---------- Heuristics: only pay extra latency when actually needed ----------
@@ -365,6 +362,13 @@ app.post("/api/chat", async (req, res) => {
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "online", service: "ZEHRIN Gemini Server", model: MODEL });
+});
+
+app.use((error, _req, res, _next) => {
+  console.error("API request failed:", error);
+  if (!res.headersSent) {
+    res.status(500).json({ error: error?.message || "Server request failed." });
+  }
 });
 
 if (fs.existsSync(distDir) && process.env.VERCEL !== "1") {
