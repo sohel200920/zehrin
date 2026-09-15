@@ -39,10 +39,16 @@ const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
 
 if (!apiKey || apiKey.includes("PASTE_YOUR")) {
   console.error("❌ GEMINI_API_KEY missing (.env check karo).");
-  process.exit(1);
 }
 
-const ai = new GoogleGenAI({ apiKey });
+const ai = apiKey && !apiKey.includes("PASTE_YOUR") ? new GoogleGenAI({ apiKey }) : null;
+
+function requireGemini() {
+  if (!ai) {
+    throw new Error("GEMINI_API_KEY is missing in the deployment environment.");
+  }
+  return ai;
+}
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
@@ -125,7 +131,7 @@ or {"actions":[{"type":"delete_short_memory","id":"..."}]}
 or, if nothing to remember/forget: {"actions":[]}`;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await requireGemini().models.generateContent({
       model: MODEL,
       contents: prompt,
       config: { responseMimeType: "application/json" }
@@ -161,7 +167,7 @@ async function executeMemoryAction(action) {
 // ---------- Image generation (best-effort, never crashes the chat) ----------
 
 async function generateImage(prompt) {
-  const response = await ai.interactions.create({
+  const response = await requireGemini().interactions.create({
     model: IMAGE_MODEL,
     input: `Create the image requested by the user. Return the generated image directly.\n\nUser request: ${prompt}`
   });
@@ -316,7 +322,7 @@ app.post("/api/chat", async (req, res) => {
 
     const systemInstruction = buildSystemPrompt(information, shortMemory, recentChats);
 
-    const stream = await ai.models.generateContentStream({
+    const stream = await requireGemini().models.generateContentStream({
       model: MODEL,
       contents: trimmed,
       config: {
